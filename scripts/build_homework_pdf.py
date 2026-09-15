@@ -226,8 +226,9 @@ def draw_header_footer(canvas, doc, title: str, total: str, score: str, accuracy
     canvas.drawCentredString(PAGE_W / 2, PAGE_H - 14 * mm, title)
     canvas.setLineWidth(0.5)
     canvas.line(MARGIN_X, PAGE_H - 18 * mm, PAGE_W - MARGIN_X, PAGE_H - 18 * mm)
-    canvas.setFont("Helvetica", 8.7)
-    canvas.drawRightString(PAGE_W - MARGIN_X, PAGE_H - 26 * mm, f"Total Points: {total}    Score: {score}    Accuracy: {accuracy} %")
+    if canvas.getPageNumber() == 1:
+        canvas.setFont("Helvetica", 8.7)
+        canvas.drawRightString(PAGE_W - MARGIN_X, PAGE_H - 26 * mm, f"Total Points: {total}    Score: {score}    Accuracy: {accuracy} %")
     if student:
         canvas.setFont("Helvetica", 8.5)
         canvas.drawString(MARGIN_X, PAGE_H - 26 * mm, f"Student: {student}")

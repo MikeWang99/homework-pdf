@@ -34,7 +34,7 @@ Use this skill when the user has a reusable physics question bank and wants to c
 - Page size: A4 portrait.
 - Margins and header/footer coordinates follow the supplied template spec.
 - Centered course/title line at the top, followed by a thin horizontal rule.
-- Right-aligned `Total Points`, `Score`, and `Accuracy` fields under the rule.
+- On page 1 only, right-aligned `Total Points`, `Score`, and `Accuracy` fields under the rule; later pages leave this score row empty.
 - Sequential question number at the left, then question title and stem in a sans-serif-like role. When a question has choices, place its image assets centered immediately below the stem, followed by the choices in a serif/math-like role.
 - Footer rule, centered `Mike's Physics - Pocket Cosmos`, and a right-aligned `Page X of Y` page number.
 - Keep the template footer wording unchanged unless the user explicitly requests a different footer.
