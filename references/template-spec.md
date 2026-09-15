@@ -13,6 +13,7 @@ These defaults were measured from the supplied `/Users/mikewang/Desktop/物理�
 - Question stem: a clean sans-serif-like role, approximately `11 pt` with stable leading; this is the default role for question text and metadata.
 - Multiple-choice options: a separate serif/math-like role, approximately `11 pt` with stable leading, visually matching the formula-heavy option lines in the supplied reference.
 - Multiple-choice image layout: when a selected question has an image, place it directly below the stem and center it within the content column before rendering the options.
+- Open-response layout: reserve ruled writing space below the question. For multi-part questions, give each normalized subquestion its own labeled response area.
 - Footer rule: black, approximately `0.5 pt`, about `14 mm` above the bottom edge.
 - Footer note: centered at approximately `8.5 mm` above the bottom edge, exactly `Mike's Physics - Pocket Cosmos`.
 - Added page number: right aligned on the same footer baseline as `Page X of Y`.

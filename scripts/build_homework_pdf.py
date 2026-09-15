@@ -55,6 +55,91 @@ def question_text(question: dict) -> str:
     return str(value)
 
 
+def _part_label(part, index: int) -> str:
+    if isinstance(part, dict):
+        label = first_value(part, ["label", "number", "id", "part", "name"], "")
+        if label:
+            return str(label).strip()
+    return f"({chr(96 + index)})" if index <= 26 else f"({index})"
+
+
+def _part_text(part) -> str:
+    if isinstance(part, dict):
+        value = first_value(part, ["text_markdown", "text", "prompt", "question", "stem", "content", "body"], "")
+        if isinstance(value, list):
+            return "\n".join(str(item) for item in value)
+        return str(value)
+    return str(part)
+
+
+def explicit_subquestions(question: dict) -> list[dict[str, str]]:
+    """Read common structured subquestion fields before using text heuristics."""
+    for key in ("subquestions", "question_parts", "parts"):
+        raw = question.get(key)
+        if not raw:
+            continue
+        if isinstance(raw, dict):
+            raw = [{"label": label, "text": value} for label, value in raw.items()]
+        if not isinstance(raw, list):
+            continue
+        parts = []
+        for index, item in enumerate(raw, start=1):
+            text = _part_text(item).strip()
+            if text:
+                parts.append({"label": _part_label(item, index), "text": text})
+        if parts:
+            return parts
+    return []
+
+
+INLINE_PART_RE = re.compile(
+    r"(?m)^[ \t]*(?:"
+    r"(?P<chinese>第[一二三四五六七八九十百\d]+小问)(?:[：:.)、，,]?\s*)"
+    r"|(?P<label>"
+    r"(?:[（(]\s*(?:[A-Za-z]+|\d+)\s*[）)])"
+    r"|(?:[A-Za-z]+|\d+)[.)：:-]"
+    r"|(?:[IVXLCDM]+|\d+)(?=\s)"
+    r")\s*(?:[.)：:-]\s*|\s+)"
+    r")"
+)
+
+
+def split_inline_subquestions(text: str) -> tuple[str, list[dict[str, str]]]:
+    """Split line-start markers such as (a), 1., I, or 第一小问."""
+    matches = list(INLINE_PART_RE.finditer(text))
+    if not matches:
+        return text.strip(), []
+
+    # A lone bare `I` or `1` at the beginning may be ordinary prose. Bare
+    # markers become subquestions only when the text provides a sequence.
+    bare_matches = [
+        match for match in matches
+        if match.group("label") and re.fullmatch(r"[IVXLCDM]+|\d+", match.group("label").strip())
+    ]
+    if len(matches) == 1 and bare_matches:
+        return text.strip(), []
+
+    parts = []
+    for index, match in enumerate(matches):
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+        part_text = text[match.end():end].strip()
+        if part_text:
+            label = match.group("label") or match.group("chinese")
+            parts.append({"label": label.strip(), "text": part_text})
+    if not parts:
+        return text.strip(), []
+    return text[:matches[0].start()].strip(), parts
+
+
+def question_sections(question: dict) -> tuple[str, list[dict[str, str]]]:
+    """Return the main stem and normalized subquestions for rendering."""
+    stem = question_text(question)
+    structured = explicit_subquestions(question)
+    if structured:
+        return stem.strip(), structured
+    return split_inline_subquestions(stem)
+
+
 def points_for(question: dict) -> float:
     value = first_value(question, ["points", "official_marks", "marks"], 0)
     try:
@@ -289,6 +374,7 @@ def build_pdf(
     styles = getSampleStyleSheet()
     qstyle = ParagraphStyle("question", parent=styles["BodyText"], fontName=question_font, fontSize=11, leading=15, textColor=colors.black, spaceAfter=3 * mm)
     option_style = ParagraphStyle("option", parent=styles["BodyText"], fontName=option_font, fontSize=11, leading=15, textColor=colors.black, spaceAfter=1.5 * mm)
+    part_style = ParagraphStyle("subquestion", parent=qstyle, leftIndent=5 * mm, firstLineIndent=-5 * mm, spaceAfter=2.2 * mm)
     title_style = ParagraphStyle("question_title", parent=qstyle, fontSize=16, leading=20, textColor=colors.HexColor("#12344D"), spaceAfter=2 * mm)
     source_style = ParagraphStyle("source", parent=qstyle, fontSize=8.2, leading=11, textColor=colors.HexColor("#476477"), spaceAfter=2 * mm)
     caption_style = ParagraphStyle("caption", parent=qstyle, fontSize=8, leading=10, textColor=colors.HexColor("#476477"), alignment=TA_LEFT)
@@ -308,9 +394,11 @@ def build_pdf(
             source_line = " · ".join(item for item in [str(source_doc) if source_doc else "", f"page {source_page}" if source_page else ""] if item)
             if source_line:
                 story.append(Paragraph(paragraph_markup(source_line), source_style))
-        stem = question_text(question)
+        stem, subquestions = question_sections(question)
         if stem:
             story.append(Paragraph(paragraph_markup(stem), qstyle))
+        for part in subquestions:
+            story.append(Paragraph(paragraph_markup(f"**{part['label']}** {part['text']}"), part_style))
 
         # For MCQs with figures, the visual hierarchy is deliberately fixed:
         # stem -> centered figure(s) -> options. This keeps a diagram attached
@@ -354,9 +442,38 @@ def build_pdf(
             if answer:
                 story.extend([Spacer(1, 3 * mm), Paragraph("Answer / solution", small_style), Paragraph(paragraph_markup(answer_text(answer)), answer_style)])
         else:
-            story.extend([Spacer(1, 3 * mm), Paragraph("Response:", small_style)])
-            for _ in range(3 if not image_refs else 2):
-                story.extend([Spacer(1, 6 * mm), Table([[""]], colWidths=[doc.width], rowHeights=[1]), Spacer(1, 1 * mm)])
+            if choices:
+                story.extend([Spacer(1, 3 * mm), Paragraph("Response:", small_style)])
+                for _ in range(3 if not image_refs else 2):
+                    story.extend([Spacer(1, 6 * mm), Table([[""]], colWidths=[doc.width], rowHeights=[1]), Spacer(1, 1 * mm)])
+            elif subquestions:
+                # Give each open-response part its own predictable writing area.
+                lines_per_part = 3 if image_refs else 4
+                for part in subquestions:
+                    story.extend([Spacer(1, 2 * mm), Paragraph(f"Response {paragraph_markup(part['label'])}:", small_style)])
+                    for _ in range(lines_per_part):
+                        ruled_line = Table([[""]], colWidths=[doc.width], rowHeights=[1])
+                        ruled_line.setStyle(TableStyle([
+                            ("LINEBELOW", (0, 0), (-1, -1), 0.4, colors.HexColor("#9AA9B2")),
+                            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                            ("TOPPADDING", (0, 0), (-1, -1), 0),
+                            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+                        ]))
+                        story.extend([Spacer(1, 4 * mm), ruled_line])
+            else:
+                # A standalone free-response question gets a larger shared area.
+                story.extend([Spacer(1, 3 * mm), Paragraph("Response:", small_style)])
+                for _ in range(4 if image_refs else 6):
+                    ruled_line = Table([[""]], colWidths=[doc.width], rowHeights=[1])
+                    ruled_line.setStyle(TableStyle([
+                        ("LINEBELOW", (0, 0), (-1, -1), 0.4, colors.HexColor("#9AA9B2")),
+                        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                        ("TOPPADDING", (0, 0), (-1, -1), 0),
+                        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+                    ]))
+                    story.extend([Spacer(1, 4 * mm), ruled_line])
         if index != len(selected):
             story.append(PageBreak())
 

@@ -59,6 +59,12 @@ For a question-level asset list, preserve the listed order. `role: stem`, `choic
 
 When a question has `choices` and image assets, the builder renders the stem first, then the image assets centered directly below it, then the choices. Asset roles do not move a question's image below its options.
 
+## Subquestions and response space
+
+Structured subquestions are read from `subquestions`, `question_parts`, or `parts`. Each item may use `label`, `number`, `id`, or `part` plus one of `text_markdown`, `text`, `prompt`, `question`, `stem`, `content`, or `body`. If no structured field exists, the builder detects line-start markers such as `(a)`, `a.`, `1.`, `I`, `II`, and `第一小问` and separates them from the introductory stem. A lone bare `I` or `1` is left untouched to avoid splitting ordinary prose.
+
+For open-response questions, the student PDF adds ruled writing space. When subquestions are present, the space is labeled and allocated separately for each subquestion; answer PDFs omit these student response lines.
+
 ## Answers
 
 For an aligned answer PDF, the builder reads `answer` first and falls back to `solution_markdown` or `explanation`. It accepts answer strings, lists, and dictionaries. Dictionaries are rendered in stable key order with `summary`, `final`, `answer`, `mark_points`, and `parts` preferred before any remaining keys. Student PDFs never render answer data.

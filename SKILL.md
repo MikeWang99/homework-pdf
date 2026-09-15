@@ -14,6 +14,8 @@ Use this skill when the user has a reusable physics question bank and wants to c
 - Resolve image paths relative to the question-bank JSON. Place each question's stem/choice image only with that question; never flatten a whole bank page into every question.
 - Use two independent typography roles: render question stems in the stable sans-serif-like question font and multiple-choice options in the stable serif/math-like option font. Do not collapse both roles into one body style.
 - For a multiple-choice question with one or more images, use the fixed order `stem → centered image(s) → choices`; the image must sit directly below the stem and remain horizontally centered within the content column.
+- For an open-response question, reserve a visible ruled writing area. If the question has subquestions, give each subquestion its own response area rather than one undifferentiated block.
+- Normalize subquestions before rendering. Prefer structured `subquestions`, `question_parts`, or `parts` fields; otherwise detect line-start markers such as `(a)`, `1.`, `I`, `II`, and `第一小问`, keeping the introductory text as the main stem.
 - Use direct source images from the bank. Do not redraw an existing figure as a vector graphic unless the user explicitly asks for reconstruction or the source asset is unusable.
 - Render the complete PDF with the bundled deterministic builder, keeping the same coordinates, fonts, sizes, margins, and spacing on every run.
 - Use the supplied template as a visual reference. The default measured spec is documented in [references/template-spec.md](references/template-spec.md); a user-supplied template path is still accepted for provenance and A4 validation.
@@ -23,7 +25,7 @@ Use this skill when the user has a reusable physics question bank and wants to c
 
 1. Inspect the selected bank and its asset manifest. Read [references/schema.md](references/schema.md) when the bank uses `asset_ids`, `stem_markdown`, or a nontrivial answer structure.
 2. Freeze the selection in manifest order. Use explicit IDs when supplied; otherwise stop and ask for a selection rather than silently exporting the entire bank.
-3. Confirm every selected record has a stable ID, question text, points if available, and resolvable image paths. For MCQs, check that the final visual order will be stem, centered image(s), then options. Fail before writing the PDF when an asset is missing.
+3. Confirm every selected record has a stable ID, question text, points if available, and resolvable image paths. Normalize any structured or line-marked subquestions and confirm the final open-response areas match them. For MCQs, check that the final visual order will be stem, centered image(s), then options. Fail before writing the PDF when an asset is missing.
 4. Run `scripts/build_homework_pdf.py` with the question JSON, optional template PDF, and output path. Use `--answers-output` only when an aligned teacher/answer PDF is requested.
 5. The first header field is `Total Points`; compute it from selected question points when the user has not supplied a total. Keep `Score` and `Accuracy` blank in a student copy unless explicit values were supplied. In an answer copy, retain the same header values and add answers in the answer area.
 6. Render the final PDF to PNG pages with Poppler and inspect the contact sheet plus every page containing a large image, a graph, a circuit, a multi-part question, or a page break. Use the visual figure QA workflow when available. Rebuild after any clipping, overlap, illegible image, wrong numbering, missing footer, or missing page number.
@@ -36,6 +38,7 @@ Use this skill when the user has a reusable physics question bank and wants to c
 - Centered course/title line at the top, followed by a thin horizontal rule.
 - On page 1 only, right-aligned `Total Points`, `Score`, and `Accuracy` fields under the rule; later pages leave this score row empty.
 - Sequential question number at the left, then question title and stem in a sans-serif-like role. When a question has choices, place its image assets centered immediately below the stem, followed by the choices in a serif/math-like role.
+- Open-response questions include ruled writing space; multi-part questions receive a separate response block for each normalized subquestion.
 - Footer rule, centered `Mike's Physics - Pocket Cosmos`, and a right-aligned `Page X of Y` page number.
 - Keep the template footer wording unchanged unless the user explicitly requests a different footer.
 
