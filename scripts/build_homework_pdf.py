@@ -237,20 +237,43 @@ def draw_header_footer(canvas, doc, title: str, total: str, score: str, accuracy
     canvas.restoreState()
 
 
-def build_pdf(output: Path, data: dict, selected: list[dict], bank_root: Path, asset_index: dict[str, dict], title: str, student: str, show_source: bool, show_answers: bool, font_path: str | None):
-    if font_path:
-        font_file = Path(font_path)
-        if not font_file.exists():
-            raise FileNotFoundError(f"Font not found: {font_file}")
-        pdfmetrics.registerFont(TTFont("LocalHomeworkFont", str(font_file)))
-        body_font = "LocalHomeworkFont"
-    else:
+def register_local_font(font_path: str | None, registered_name: str) -> str | None:
+    if not font_path:
+        return None
+    font_file = Path(font_path)
+    if not font_file.exists():
+        raise FileNotFoundError(f"Font not found: {font_file}")
+    pdfmetrics.registerFont(TTFont(registered_name, str(font_file)))
+    return registered_name
+
+
+def build_pdf(
+    output: Path,
+    data: dict,
+    selected: list[dict],
+    bank_root: Path,
+    asset_index: dict[str, dict],
+    title: str,
+    student: str,
+    show_source: bool,
+    show_answers: bool,
+    question_font_path: str | None,
+    option_font_path: str | None,
+):
+    # The screenshot/template uses two visual text roles: a clean sans-serif
+    # question stem and a serif/math-like option line. Keep both deterministic
+    # and independently overrideable for banks with a known source font.
+    question_font = register_local_font(question_font_path, "LocalHomeworkQuestionFont")
+    option_font = register_local_font(option_font_path, "LocalHomeworkOptionFont")
+    if question_font is None:
         system_font = Path("/System/Library/Fonts/STHeiti Medium.ttc")
         if system_font.exists():
-            pdfmetrics.registerFont(TTFont("LocalHomeworkFont", str(system_font)))
-            body_font = "LocalHomeworkFont"
+            pdfmetrics.registerFont(TTFont("LocalHomeworkQuestionFont", str(system_font)))
+            question_font = "LocalHomeworkQuestionFont"
         else:
-            body_font = "Helvetica"
+            question_font = "Helvetica"
+    if option_font is None:
+        option_font = "Times-Roman"
 
     assignment = data.get("assignment", {}) if isinstance(data.get("assignment", {}), dict) else {}
     total_raw = assignment.get("total_points")
@@ -263,7 +286,8 @@ def build_pdf(output: Path, data: dict, selected: list[dict], bank_root: Path, a
     doc.addPageTemplates([PageTemplate(id="homework", frames=frame, onPage=lambda c, d: draw_header_footer(c, d, title, total, score, accuracy, student))])
 
     styles = getSampleStyleSheet()
-    qstyle = ParagraphStyle("question", parent=styles["BodyText"], fontName=body_font, fontSize=11, leading=15, textColor=colors.black, spaceAfter=3 * mm)
+    qstyle = ParagraphStyle("question", parent=styles["BodyText"], fontName=question_font, fontSize=11, leading=15, textColor=colors.black, spaceAfter=3 * mm)
+    option_style = ParagraphStyle("option", parent=styles["BodyText"], fontName=option_font, fontSize=11, leading=15, textColor=colors.black, spaceAfter=1.5 * mm)
     title_style = ParagraphStyle("question_title", parent=qstyle, fontSize=16, leading=20, textColor=colors.HexColor("#12344D"), spaceAfter=2 * mm)
     source_style = ParagraphStyle("source", parent=qstyle, fontSize=8.2, leading=11, textColor=colors.HexColor("#476477"), spaceAfter=2 * mm)
     caption_style = ParagraphStyle("caption", parent=qstyle, fontSize=8, leading=10, textColor=colors.HexColor("#476477"), alignment=TA_LEFT)
@@ -275,7 +299,7 @@ def build_pdf(output: Path, data: dict, selected: list[dict], bank_root: Path, a
         source = question.get("source", {}) if isinstance(question.get("source", {}), dict) else {}
         original = first_value(source, ["original_id", "original_number"], question.get("source_question_number", ""))
         qtitle = question.get("title") or question.get("topic") or (f"Question {original}" if original else "Selected question")
-        story.append(Paragraph(f"{index}.", ParagraphStyle("number", parent=title_style, fontName=body_font, fontSize=16, leading=19, spaceAfter=1 * mm)))
+        story.append(Paragraph(f"{index}.", ParagraphStyle("number", parent=title_style, fontName=question_font, fontSize=16, leading=19, spaceAfter=1 * mm)))
         story.append(Paragraph(paragraph_markup(str(qtitle)), title_style))
         if show_source and source:
             source_doc = first_value(source, ["document", "file"], "")
@@ -287,15 +311,9 @@ def build_pdf(output: Path, data: dict, selected: list[dict], bank_root: Path, a
         if stem:
             story.append(Paragraph(paragraph_markup(stem), qstyle))
 
-        choices = question.get("choices") or []
-        for choice in choices:
-            if isinstance(choice, dict):
-                label = choice.get("label", "")
-                text = first_value(choice, ["text_markdown", "text", "content"], "")
-                story.append(Paragraph(paragraph_markup(f"({label}) {text}"), qstyle))
-            else:
-                story.append(Paragraph(paragraph_markup(str(choice)), qstyle))
-
+        # For MCQs with figures, the visual hierarchy is deliberately fixed:
+        # stem -> centered figure(s) -> options. This keeps a diagram attached
+        # to the question it explains and matches the supplied reference page.
         image_refs = resolve_images(question, bank_root, asset_index)
         image_cap = 150 * mm if len(image_refs) <= 1 else 88 * mm
         for image_path, caption in image_refs:
@@ -305,10 +323,28 @@ def build_pdf(output: Path, data: dict, selected: list[dict], bank_root: Path, a
             scale = min(max_width / image.imageWidth, max_height / image.imageHeight, 1.0)
             image.drawWidth = image.imageWidth * scale
             image.drawHeight = image.imageHeight * scale
+            centered_image = Table([[image]], colWidths=[doc.width])
+            centered_image.setStyle(TableStyle([
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ]))
             story.append(Spacer(1, 1 * mm))
-            story.append(image)
+            story.append(centered_image)
             if caption:
                 story.append(Paragraph(paragraph_markup(caption), caption_style))
+
+        choices = question.get("choices") or []
+        for choice in choices:
+            if isinstance(choice, dict):
+                label = choice.get("label", "")
+                text = first_value(choice, ["text_markdown", "text", "content"], "")
+                story.append(Paragraph(paragraph_markup(f"({label}) {text}"), option_style))
+            else:
+                story.append(Paragraph(paragraph_markup(str(choice)), option_style))
 
         if show_answers:
             answer = question.get("answer")
@@ -351,7 +387,9 @@ def main() -> int:
     parser.add_argument("--title")
     parser.add_argument("--student-name", default="")
     parser.add_argument("--show-source", action="store_true")
-    parser.add_argument("--font")
+    parser.add_argument("--font", help="Legacy alias for --question-font-path")
+    parser.add_argument("--question-font-path", help="TrueType/OpenType font for question stems and metadata")
+    parser.add_argument("--option-font-path", help="TrueType/OpenType font for multiple-choice options")
     args = parser.parse_args()
 
     try:
@@ -365,9 +403,10 @@ def main() -> int:
         selected = [question_index[qid] for qid in ids]
         collection = data.get("collection", {}) if isinstance(data.get("collection", {}), dict) else {}
         title = args.title or first_value(data.get("assignment", {}) if isinstance(data.get("assignment", {}), dict) else {}, ["title"], "") or first_value(collection, ["template_title", "title", "course"], "Physics Homework")
-        build_pdf(args.output, data, selected, args.manifest.parent, asset_index, title, args.student_name, args.show_source, False, args.font)
+        question_font_path = args.question_font_path or args.font
+        build_pdf(args.output, data, selected, args.manifest.parent, asset_index, title, args.student_name, args.show_source, False, question_font_path, args.option_font_path)
         if args.answers_output:
-            build_pdf(args.answers_output, data, selected, args.manifest.parent, asset_index, title, args.student_name, args.show_source, True, args.font)
+            build_pdf(args.answers_output, data, selected, args.manifest.parent, asset_index, title, args.student_name, args.show_source, True, question_font_path, args.option_font_path)
         print(f"Created {args.output} ({len(selected)} questions)")
         if args.answers_output:
             print(f"Created {args.answers_output}")

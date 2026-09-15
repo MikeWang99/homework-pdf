@@ -12,6 +12,8 @@ Use this skill when the user has a reusable physics question bank and wants to c
 - Treat the question-bank JSON as the source of truth for question order, wording, points, answer data, and asset references.
 - Preserve the selected question's wording unless the user explicitly requests translation, adaptation, or numerical changes.
 - Resolve image paths relative to the question-bank JSON. Place each question's stem/choice image only with that question; never flatten a whole bank page into every question.
+- Use two independent typography roles: render question stems in the stable sans-serif-like question font and multiple-choice options in the stable serif/math-like option font. Do not collapse both roles into one body style.
+- For a multiple-choice question with one or more images, use the fixed order `stem → centered image(s) → choices`; the image must sit directly below the stem and remain horizontally centered within the content column.
 - Use direct source images from the bank. Do not redraw an existing figure as a vector graphic unless the user explicitly asks for reconstruction or the source asset is unusable.
 - Render the complete PDF with the bundled deterministic builder, keeping the same coordinates, fonts, sizes, margins, and spacing on every run.
 - Use the supplied template as a visual reference. The default measured spec is documented in [references/template-spec.md](references/template-spec.md); a user-supplied template path is still accepted for provenance and A4 validation.
@@ -21,7 +23,7 @@ Use this skill when the user has a reusable physics question bank and wants to c
 
 1. Inspect the selected bank and its asset manifest. Read [references/schema.md](references/schema.md) when the bank uses `asset_ids`, `stem_markdown`, or a nontrivial answer structure.
 2. Freeze the selection in manifest order. Use explicit IDs when supplied; otherwise stop and ask for a selection rather than silently exporting the entire bank.
-3. Confirm every selected record has a stable ID, question text, points if available, and resolvable image paths. Fail before writing the PDF when an asset is missing.
+3. Confirm every selected record has a stable ID, question text, points if available, and resolvable image paths. For MCQs, check that the final visual order will be stem, centered image(s), then options. Fail before writing the PDF when an asset is missing.
 4. Run `scripts/build_homework_pdf.py` with the question JSON, optional template PDF, and output path. Use `--answers-output` only when an aligned teacher/answer PDF is requested.
 5. The first header field is `Total Points`; compute it from selected question points when the user has not supplied a total. Keep `Score` and `Accuracy` blank in a student copy unless explicit values were supplied. In an answer copy, retain the same header values and add answers in the answer area.
 6. Render the final PDF to PNG pages with Poppler and inspect the contact sheet plus every page containing a large image, a graph, a circuit, a multi-part question, or a page break. Use the visual figure QA workflow when available. Rebuild after any clipping, overlap, illegible image, wrong numbering, missing footer, or missing page number.
@@ -33,7 +35,7 @@ Use this skill when the user has a reusable physics question bank and wants to c
 - Margins and header/footer coordinates follow the supplied template spec.
 - Centered course/title line at the top, followed by a thin horizontal rule.
 - Right-aligned `Total Points`, `Score`, and `Accuracy` fields under the rule.
-- Sequential question number at the left, then question title/text and any selected image assets.
+- Sequential question number at the left, then question title and stem in a sans-serif-like role. When a question has choices, place its image assets centered immediately below the stem, followed by the choices in a serif/math-like role.
 - Footer rule, centered `Mike's Physics - Pocket Cosmos`, and a right-aligned `Page X of Y` page number.
 - Keep the template footer wording unchanged unless the user explicitly requests a different footer.
 
@@ -56,7 +58,9 @@ Useful options:
 - `--student-name TEXT`: add a student-name line below the header fields.
 - `--show-source`: show source file/page metadata beneath each question; omit for a clean student copy.
 - `--answers-output FILE`: create a second, page-aligned answer PDF from the same selected records.
-- `--font PATH`: register a TrueType/OpenType font when the question bank needs a local language font.
+- `--question-font-path PATH`: register a TrueType/OpenType font for question stems and metadata. If omitted on macOS, the builder uses the available STHeiti Medium font, otherwise Helvetica.
+- `--option-font-path PATH`: register a TrueType/OpenType font for multiple-choice options; the deterministic default is Times-Roman.
+- `--font PATH`: legacy alias for `--question-font-path`.
 
 The builder accepts both the canonical question-bank schema (`questions[].asset_ids` plus a sibling `assets` manifest) and the common compact schema (`questions[].asset` or `questions[].assets[].path`). See [references/schema.md](references/schema.md).
 

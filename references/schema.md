@@ -57,6 +57,8 @@ The builder resolves images in this order:
 
 For a question-level asset list, preserve the listed order. `role: stem`, `choice`, and `shared` are display hints; the builder does not guess ownership or crop images. A missing path is a hard error.
 
+When a question has `choices` and image assets, the builder renders the stem first, then the image assets centered directly below it, then the choices. Asset roles do not move a question's image below its options.
+
 ## Answers
 
 For an aligned answer PDF, the builder reads `answer` first and falls back to `solution_markdown` or `explanation`. It accepts answer strings, lists, and dictionaries. Dictionaries are rendered in stable key order with `summary`, `final`, `answer`, `mark_points`, and `parts` preferred before any remaining keys. Student PDFs never render answer data.
