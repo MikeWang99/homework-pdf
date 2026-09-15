@@ -1,4 +1,4 @@
 interface:
-  display_name: "Question Bank Homework PDF"
-  short_description: "Build deterministic homework PDFs from selected bank questions"
-  default_prompt: "Use $question-bank-homework-pdf to turn selected question-bank IDs and image assets into a template-matched homework PDF."
+  display_name: "作业 PDF"
+  short_description: "从题库生成稳定的作业 PDF"
+  default_prompt: "Use $homework-pdf to turn selected question-bank IDs and image assets into a template-matched homework PDF."
