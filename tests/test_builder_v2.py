@@ -36,6 +36,20 @@ class BuilderTests(unittest.TestCase):
             assets={"a":{"id":"a","file":"a.png","role":"choice"}}
             with self.assertRaises(ValueError): B.validate_question(q, root, assets)
 
+    def test_unknown_asset_role_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); (root/"a.png").write_bytes(PNG)
+            q={"id":"q1","stem":"x","asset_ids":["a"]}
+            assets={"a":{"id":"a","file":"a.png","role":"mystery"}}
+            with self.assertRaises(ValueError): B.validate_question(q, root, assets)
+
+    def test_choice_asset_must_match_existing_choice(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); (root/"a.png").write_bytes(PNG)
+            q={"id":"q1","stem":"x","choices":[{"label":"A","text":"x"}],"asset_ids":["a"]}
+            assets={"a":{"id":"a","file":"a.png","role":"choice","choice_label":"B"}}
+            with self.assertRaises(ValueError): B.validate_question(q, root, assets)
+
     def test_unsupported_latex_fails(self):
         q={"id":"q1","stem":r"Use $\\begin{cases}x\\end{cases}$","asset_ids":[]}
         with tempfile.TemporaryDirectory() as tmp:
