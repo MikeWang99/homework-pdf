@@ -19,6 +19,7 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import (
     BaseDocTemplate,
+    CondPageBreak,
     Frame,
     Image as RLImage,
     PageBreak,
@@ -167,6 +168,11 @@ def paragraph_markup(value) -> str:
 
 def format_inline_math(text: str) -> str:
     """Make common lightweight LaTeX notation readable without a runtime renderer."""
+    # Keep unit and short text commands readable before processing exponents.
+    # This intentionally supports only the simple, non-nested form used in
+    # question-bank stems (for example ``\mathrm{cm^3}``), rather than
+    # accepting arbitrary LaTeX/HTML markup in the PDF renderer.
+    text = re.sub(r"\\(?:mathrm|text|textrm|operatorname)\{([^{}]*)\}", r"\1", text)
     replacements = {
         r"\propto": "∝",
         r"\times": "×",
@@ -183,6 +189,8 @@ def format_inline_math(text: str) -> str:
     for source, target in replacements.items():
         text = text.replace(source, target)
     text = re.sub(r"\\frac\{([^{}]+)\}\{([^{}]+)\}", r"(\1)/(\2)", text)
+    text = re.sub(r"_\{([^{}]+)\}", r"<sub>\1</sub>", text)
+    text = re.sub(r"_([A-Za-z0-9]+)", r"<sub>\1</sub>", text)
     text = re.sub(r"\^\{([^{}]+)\}", r"<super>\1</super>", text)
     text = re.sub(r"\^([0-9+-]+)", r"<super>\1</super>", text)
     text = text.replace(r"\sqrt", "√")
@@ -345,25 +353,21 @@ def build_pdf(
     show_answers: bool,
     question_font_path: str | None,
     option_font_path: str | None,
+    front_matter: str,
 ):
-    # The screenshot/template uses two visual text roles: a clean sans-serif
-    # question stem and a serif/math-like option line. Keep both deterministic
-    # and independently overrideable for banks with a known source font.
+    # The question stem must match the template's Helvetica header. Keep the
+    # multiple-choice option role separately overrideable for math-heavy sets.
     question_font = register_local_font(question_font_path, "LocalHomeworkQuestionFont")
     option_font = register_local_font(option_font_path, "LocalHomeworkOptionFont")
     if question_font is None:
-        system_font = Path("/System/Library/Fonts/STHeiti Medium.ttc")
-        if system_font.exists():
-            pdfmetrics.registerFont(TTFont("LocalHomeworkQuestionFont", str(system_font)))
-            question_font = "LocalHomeworkQuestionFont"
-        else:
-            question_font = "Helvetica"
+        question_font = "Helvetica"
     if option_font is None:
         option_font = "Times-Roman"
 
     assignment = data.get("assignment", {}) if isinstance(data.get("assignment", {}), dict) else {}
     total_raw = assignment.get("total_points")
-    total = format_number(sum(points_for(q) for q in selected)) if total_raw in (None, "") else str(total_raw)
+    has_recorded_points = any(first_value(q, ["points", "official_marks", "marks"], None) is not None for q in selected)
+    total = format_number(sum(points_for(q) for q in selected)) if total_raw in (None, "") and has_recorded_points else ("—" if total_raw in (None, "") else str(total_raw))
     score = str(assignment.get("score", ""))
     accuracy = str(assignment.get("accuracy", ""))
 
@@ -375,19 +379,32 @@ def build_pdf(
     qstyle = ParagraphStyle("question", parent=styles["BodyText"], fontName=question_font, fontSize=11, leading=15, textColor=colors.black, spaceAfter=3 * mm)
     option_style = ParagraphStyle("option", parent=styles["BodyText"], fontName=option_font, fontSize=11, leading=15, textColor=colors.black, spaceAfter=1.5 * mm)
     part_style = ParagraphStyle("subquestion", parent=qstyle, leftIndent=5 * mm, firstLineIndent=-5 * mm, spaceAfter=2.2 * mm)
-    title_style = ParagraphStyle("question_title", parent=qstyle, fontSize=16, leading=20, textColor=colors.HexColor("#12344D"), spaceAfter=2 * mm)
     source_style = ParagraphStyle("source", parent=qstyle, fontSize=8.2, leading=11, textColor=colors.HexColor("#476477"), spaceAfter=2 * mm)
     caption_style = ParagraphStyle("caption", parent=qstyle, fontSize=8, leading=10, textColor=colors.HexColor("#476477"), alignment=TA_LEFT)
     answer_style = ParagraphStyle("answer", parent=qstyle, fontSize=9.5, leading=13, textColor=colors.HexColor("#12344D"), backColor=colors.HexColor("#F3F7F9"), borderColor=colors.HexColor("#B7C8D2"), borderWidth=.5, borderPadding=7)
     small_style = ParagraphStyle("small", parent=qstyle, fontSize=8.5, leading=11)
 
     story = []
+    if front_matter.strip():
+        front_style = ParagraphStyle(
+            "front_matter",
+            parent=qstyle,
+            fontSize=13,
+            leading=22,
+            alignment=1,
+            borderColor=colors.HexColor("#12344D"),
+            borderWidth=0.75,
+            borderPadding=16,
+        )
+        story.extend([Spacer(1, 10 * mm), Paragraph(paragraph_markup(front_matter.strip()), front_style), PageBreak()])
     for index, question in enumerate(selected, start=1):
         source = question.get("source", {}) if isinstance(question.get("source", {}), dict) else {}
-        original = first_value(source, ["original_id", "original_number"], question.get("source_question_number", ""))
-        qtitle = question.get("title") or question.get("topic") or (f"Question {original}" if original else "Selected question")
-        story.append(Paragraph(f"{index}.", ParagraphStyle("number", parent=title_style, fontName=question_font, fontSize=16, leading=19, spaceAfter=1 * mm)))
-        story.append(Paragraph(paragraph_markup(str(qtitle)), title_style))
+        image_refs = resolve_images(question, bank_root, asset_index)
+        image_cap = 150 * mm if len(image_refs) <= 1 else 88 * mm
+        # Do not strand a question number/stem at the foot of one page while
+        # its circuit diagram begins on the next.
+        if index > 1:
+            story.append(CondPageBreak(125 * mm if image_refs else 55 * mm))
         if show_source and source:
             source_doc = first_value(source, ["document", "file"], "")
             source_page = first_value(source, ["pdf_page", "source_page", "page"], "")
@@ -396,15 +413,18 @@ def build_pdf(
                 story.append(Paragraph(paragraph_markup(source_line), source_style))
         stem, subquestions = question_sections(question)
         if stem:
-            story.append(Paragraph(paragraph_markup(stem), qstyle))
+            # The export sequence is the only student-facing question number.
+            # Never surface an original/source paper identifier in this line.
+            story.append(Paragraph(paragraph_markup(f"{index}. {stem}"), qstyle))
+        else:
+            story.append(Paragraph(f"{index}.", qstyle))
         for part in subquestions:
             story.append(Paragraph(paragraph_markup(f"**{part['label']}** {part['text']}"), part_style))
 
         # For MCQs with figures, the visual hierarchy is deliberately fixed:
         # stem -> centered figure(s) -> options. This keeps a diagram attached
         # to the question it explains and matches the supplied reference page.
-        image_refs = resolve_images(question, bank_root, asset_index)
-        image_cap = 150 * mm if len(image_refs) <= 1 else 88 * mm
+        rendered_image_height = 0.0
         for image_path, caption in image_refs:
             image = RLImage(str(image_path))
             max_width = doc.width * 0.96
@@ -412,6 +432,7 @@ def build_pdf(
             scale = min(max_width / image.imageWidth, max_height / image.imageHeight, 1.0)
             image.drawWidth = image.imageWidth * scale
             image.drawHeight = image.imageHeight * scale
+            rendered_image_height += image.drawHeight
             centered_image = Table([[image]], colWidths=[doc.width])
             centered_image.setStyle(TableStyle([
                 ("ALIGN", (0, 0), (-1, -1), "CENTER"),
@@ -442,40 +463,12 @@ def build_pdf(
             if answer:
                 story.extend([Spacer(1, 3 * mm), Paragraph("Answer / solution", small_style), Paragraph(paragraph_markup(answer_text(answer)), answer_style)])
         else:
-            if choices:
-                story.extend([Spacer(1, 3 * mm), Paragraph("Response:", small_style)])
-                for _ in range(3 if not image_refs else 2):
-                    story.extend([Spacer(1, 6 * mm), Table([[""]], colWidths=[doc.width], rowHeights=[1]), Spacer(1, 1 * mm)])
-            elif subquestions:
-                # Give each open-response part its own predictable writing area.
-                lines_per_part = 3 if image_refs else 4
-                for part in subquestions:
-                    story.extend([Spacer(1, 2 * mm), Paragraph(f"Response {paragraph_markup(part['label'])}:", small_style)])
-                    for _ in range(lines_per_part):
-                        ruled_line = Table([[""]], colWidths=[doc.width], rowHeights=[1])
-                        ruled_line.setStyle(TableStyle([
-                            ("LINEBELOW", (0, 0), (-1, -1), 0.4, colors.HexColor("#9AA9B2")),
-                            ("LEFTPADDING", (0, 0), (-1, -1), 0),
-                            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-                            ("TOPPADDING", (0, 0), (-1, -1), 0),
-                            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-                        ]))
-                        story.extend([Spacer(1, 4 * mm), ruled_line])
-            else:
-                # A standalone free-response question gets a larger shared area.
-                story.extend([Spacer(1, 3 * mm), Paragraph("Response:", small_style)])
-                for _ in range(4 if image_refs else 6):
-                    ruled_line = Table([[""]], colWidths=[doc.width], rowHeights=[1])
-                    ruled_line.setStyle(TableStyle([
-                        ("LINEBELOW", (0, 0), (-1, -1), 0.4, colors.HexColor("#9AA9B2")),
-                        ("LEFTPADDING", (0, 0), (-1, -1), 0),
-                        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-                        ("TOPPADDING", (0, 0), (-1, -1), 0),
-                        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-                    ]))
-                    story.extend([Spacer(1, 4 * mm), ruled_line])
-        if index != len(selected):
-            story.append(PageBreak())
+            if not choices:
+                # Free-response work space is deliberately blank: no "Response"
+                # label and no ruled lines. It scales with the question's figure
+                # footprint, then the next selected question follows naturally.
+                blank_height = max(24 * mm, min(80 * mm, 18 * mm + 0.45 * rendered_image_height))
+                story.append(Spacer(1, blank_height))
 
     output.parent.mkdir(parents=True, exist_ok=True)
     doc.build(story, canvasmaker=NumberedCanvas)
@@ -504,6 +497,7 @@ def main() -> int:
     parser.add_argument("--answers-output", type=Path)
     parser.add_argument("--title")
     parser.add_argument("--student-name", default="")
+    parser.add_argument("--front-matter", type=Path, help="UTF-8 text file rendered as a standalone first page")
     parser.add_argument("--show-source", action="store_true")
     parser.add_argument("--font", help="Legacy alias for --question-font-path")
     parser.add_argument("--question-font-path", help="TrueType/OpenType font for question stems and metadata")
@@ -522,9 +516,10 @@ def main() -> int:
         collection = data.get("collection", {}) if isinstance(data.get("collection", {}), dict) else {}
         title = args.title or first_value(data.get("assignment", {}) if isinstance(data.get("assignment", {}), dict) else {}, ["title"], "") or first_value(collection, ["template_title", "title", "course"], "Physics Homework")
         question_font_path = args.question_font_path or args.font
-        build_pdf(args.output, data, selected, args.manifest.parent, asset_index, title, args.student_name, args.show_source, False, question_font_path, args.option_font_path)
+        front_matter = args.front_matter.read_text(encoding="utf-8") if args.front_matter else ""
+        build_pdf(args.output, data, selected, args.manifest.parent, asset_index, title, args.student_name, args.show_source, False, question_font_path, args.option_font_path, front_matter)
         if args.answers_output:
-            build_pdf(args.answers_output, data, selected, args.manifest.parent, asset_index, title, args.student_name, args.show_source, True, question_font_path, args.option_font_path)
+            build_pdf(args.answers_output, data, selected, args.manifest.parent, asset_index, title, args.student_name, args.show_source, True, question_font_path, args.option_font_path, front_matter)
         print(f"Created {args.output} ({len(selected)} questions)")
         if args.answers_output:
             print(f"Created {args.answers_output}")

@@ -12,9 +12,10 @@ Use this skill when the user has a reusable physics question bank and wants to c
 - Treat the question-bank JSON as the source of truth for question order, wording, points, answer data, and asset references.
 - Preserve the selected question's wording unless the user explicitly requests translation, adaptation, or numerical changes.
 - Resolve image paths relative to the question-bank JSON. Place each question's stem/choice image only with that question; never flatten a whole bank page into every question.
-- Use two independent typography roles: render question stems in the stable sans-serif-like question font and multiple-choice options in the stable serif/math-like option font. Do not collapse both roles into one body style.
+- Use two independent typography roles: question stems and their export-order numbers use the exact Helvetica font used by the page header; multiple-choice options use the stable serif/math-like option font. Do not collapse both roles into one body style.
 - For a multiple-choice question with one or more images, use the fixed order `stem → centered image(s) → choices`; the image must sit directly below the stem and remain horizontally centered within the content column.
-- For an open-response question, reserve a visible ruled writing area. If the question has subquestions, give each subquestion its own response area rather than one undifferentiated block.
+- For a free-response question, reserve unruled blank space after its content, roughly proportional to the question's own footprint. Do not print `Response:` or draw writing lines. Multiple-choice questions receive no extra response space.
+- Student-facing numbering always follows the selected export order: `1.`, `2.`, `3.`. Do not render source-paper question numbers, titles, topics, or other labels in place of that sequence.
 - Normalize subquestions before rendering. Prefer structured `subquestions`, `question_parts`, or `parts` fields; otherwise detect line-start markers such as `(a)`, `1.`, `I`, `II`, and `第一小问`, keeping the introductory text as the main stem.
 - Use direct source images from the bank. Do not redraw an existing figure as a vector graphic unless the user explicitly asks for reconstruction or the source asset is unusable.
 - Render the complete PDF with the bundled deterministic builder, keeping the same coordinates, fonts, sizes, margins, and spacing on every run.
@@ -37,8 +38,9 @@ Use this skill when the user has a reusable physics question bank and wants to c
 - Margins and header/footer coordinates follow the supplied template spec.
 - Centered course/title line at the top, followed by a thin horizontal rule.
 - On page 1 only, right-aligned `Total Points`, `Score`, and `Accuracy` fields under the rule; later pages leave this score row empty.
-- Sequential question number at the left, then question title and stem in a sans-serif-like role. When a question has choices, place its image assets centered immediately below the stem, followed by the choices in a serif/math-like role.
-- Open-response questions include ruled writing space; multi-part questions receive a separate response block for each normalized subquestion.
+- Sequential question number at the left, followed directly by the stem in the same Helvetica role as the page header. When a question has choices, place its image assets centered immediately below the stem, followed by the choices in a serif/math-like role.
+- Free-response questions end with proportional blank space, without a response label or ruled lines; multiple-choice questions end after their choices.
+- Every student-facing question begins with the current exported sequence number in the same black question-text style. Source identifiers remain metadata only and are shown only when explicitly requested with `--show-source`.
 - Footer rule, centered `Mike's Physics - Pocket Cosmos`, and a right-aligned `Page X of Y` page number.
 - Keep the template footer wording unchanged unless the user explicitly requests a different footer.
 
@@ -59,9 +61,10 @@ Useful options:
 - `--ids-file FILE`: one question ID per line, preserving the file's order.
 - `--title TEXT`: override the title used in the header.
 - `--student-name TEXT`: add a student-name line below the header fields.
+- `--front-matter FILE`: render an explicitly supplied UTF-8 text block as a standalone first page; use only for user-requested material such as an instruction or decision chain, never as an invented extra question.
 - `--show-source`: show source file/page metadata beneath each question; omit for a clean student copy.
 - `--answers-output FILE`: create a second, page-aligned answer PDF from the same selected records.
-- `--question-font-path PATH`: register a TrueType/OpenType font for question stems and metadata. If omitted on macOS, the builder uses the available STHeiti Medium font, otherwise Helvetica.
+- `--question-font-path PATH`: explicitly override the header-matching Helvetica font for question stems and metadata when a user asks for a different typeface.
 - `--option-font-path PATH`: register a TrueType/OpenType font for multiple-choice options; the deterministic default is Times-Roman.
 - `--font PATH`: legacy alias for `--question-font-path`.
 
