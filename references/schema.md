@@ -1,74 +1,40 @@
-# Input schema and asset resolution
+# Input schema and asset resolution · v2
 
-The preferred input is a question-bank JSON file. Paths are relative to the JSON file's directory unless they are absolute.
+The preferred input is the `physics-bank` v2 schema. Paths are relative to the question JSON directory unless absolute.
+
+## Question text
+
+Use the first non-empty field: `stem_markdown`, `stem`, `prompt`, `question`, `text`. `context` is rendered before the stem when present. Structured subquestions come from `subquestions`, `question_parts`, or `parts`; text heuristics are only a compatibility fallback.
+
+## Points
+
+Use `points`, then `official_marks`, then `marks`. If none exists, the computed total omits that question rather than inventing marks. A top-level `assignment.total_points` overrides the computed total.
+
+## Assets
+
+Canonical v2 assets are top-level records referenced by `question.asset_ids`:
 
 ```json
 {
-  "collection": {
-    "title": "AP Physics 2 - Circuits",
-    "course": "AP Physics 2",
-    "template_title": "AP Physics 2 - Circuits"
-  },
-  "assignment": {
-    "total_points": null,
-    "score": "",
-    "accuracy": ""
-  },
-  "questions": [
-    {
-      "id": "circuits-2019-q05b",
-      "stem_markdown": "A resistance network is shown below.",
-      "type": "structured_response",
-      "official_marks": 4,
-      "knowledge_points": ["Kirchhoff's laws", "equivalent resistance"],
-      "assets": [
-        {"path": "assets/figures/circuits-2019-q05b.png", "role": "stem", "alt": "Resistance network"}
-      ],
-      "source": {"document": "2019_section_2.pdf", "pdf_page": 10, "original_id": "5(b)"},
-      "answer": {"summary": "...", "mark_points": ["..."]}
-    }
-  ],
-  "assets": [
-    {
-      "id": "circuits-2019-q05b-figure",
-      "file": "assets/figures/circuits-2019-q05b.png",
-      "role": "stem",
-      "owners": ["circuits-2019-q05b"]
-    }
-  ]
+  "id": "q5-choice-a",
+  "file": "assets/figures/q5-choice-a.png",
+  "role": "choice",
+  "choice_label": "A",
+  "owners": ["q5"],
+  "reviewed": true
 }
 ```
 
-## Accepted question text fields
+Roles are `stem`, `shared`, and `choice`. `stem/shared` assets are rendered after the question context/stem and before choices. A `choice` asset is rendered directly with the matching choice and **must** have `choice_label`; mismatches are hard errors. Compact legacy `question.assets[]` and `question.asset` are still accepted.
 
-Use the first non-empty field in this order: `stem_markdown`, `stem`, `prompt`, `question`, `text`. Basic Markdown line breaks are supported. If a source bank stores already-rendered HTML/ReportLab markup, normalize or escape it before passing it to the builder; do not allow arbitrary HTML to change the page layout.
+## Math
 
-## Accepted points fields
+The canonical bank remains `markdown+latex`. Homework PDF v2 supports inline `$...$` and display `$$...$$` plus the documented common physics command subset implemented in the builder. Unknown LaTeX commands are a hard build error instead of being silently dropped or printed incorrectly.
 
-Use `points`, then `official_marks`, then `marks`. If none exists, count the question as zero points and leave a warning in the build report. A top-level `assignment.total_points` overrides the computed sum.
+## Response area
 
-## Accepted image forms
+Free-response questions receive **unruled blank space** only. No `Response:` label and no writing lines. Multi-part labels remain part of the question text; the blank area follows the complete question.
 
-The builder resolves images in this order:
+## Selection
 
-1. `question.asset_ids` through the top-level `assets[].id` to `assets[].file`.
-2. `question.assets[].path`, `question.assets[].file`, or `question.assets[].asset`.
-3. `question.asset` when it is a string.
-
-For a question-level asset list, preserve the listed order. `role: stem`, `choice`, and `shared` are display hints; the builder does not guess ownership or crop images. A missing path is a hard error.
-
-When a question has `choices` and image assets, the builder renders the stem first, then the image assets centered directly below it, then the choices. Asset roles do not move a question's image below its options.
-
-## Subquestions and response space
-
-Structured subquestions are read from `subquestions`, `question_parts`, or `parts`. Each item may use `label`, `number`, `id`, or `part` plus one of `text_markdown`, `text`, `prompt`, `question`, `stem`, `content`, or `body`. If no structured field exists, the builder detects line-start markers such as `(a)`, `a.`, `1.`, `I`, `II`, and `第一小问` and separates them from the introductory stem. A lone bare `I` or `1` is left untouched to avoid splitting ordinary prose.
-
-For open-response questions, the student PDF adds ruled writing space. When subquestions are present, the space is labeled and allocated separately for each subquestion; answer PDFs omit these student response lines.
-
-## Answers
-
-For an aligned answer PDF, the builder reads `answer` first and falls back to `solution_markdown` or `explanation`. It accepts answer strings, lists, and dictionaries. Dictionaries are rendered in stable key order with `summary`, `final`, `answer`, `mark_points`, and `parts` preferred before any remaining keys. Student PDFs never render answer data.
-
-## Selection rules
-
-`--question-ids` and `--ids-file` select by exact `id`. Selection order comes from the comma-separated argument or IDs file, not from sorting. Duplicate IDs are rejected. Unknown IDs are rejected before PDF creation.
+`--question-ids` and `--ids-file` select exact IDs in the supplied order. Duplicates and unknown IDs are rejected before rendering.

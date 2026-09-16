@@ -1,4 +1,4 @@
 interface:
   display_name: "作业 PDF"
-  short_description: "从题库生成稳定的作业 PDF"
-  default_prompt: "Use $homework-pdf to turn selected question-bank IDs and image assets into a template-matched homework PDF."
+  short_description: "从题库稳定生成并校验作业 PDF"
+  default_prompt: "Use $homework-pdf v2 end-to-end: validate selected bank records, preserve choice-image ownership, build with a report, run post-build validation, visually inspect the final pages, and only then deliver the PDF."
