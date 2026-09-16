@@ -177,6 +177,8 @@ def format_inline_math(text: str) -> str:
         r"\propto": "∝",
         r"\times": "×",
         r"\cdot": "·",
+        r"\ldots": "…",
+        r"\cdots": "⋯",
         r"\Omega": "Ω",
         r"\Delta": "Δ",
         r"\theta": "θ",
