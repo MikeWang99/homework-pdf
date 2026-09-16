@@ -321,13 +321,12 @@ def validate_question(q: dict, bank_root: Path, asset_index: dict[str, dict]) ->
     for asset in assets:
         role = asset.get("role")
         if role not in {"stem", "shared", "choice"}:
-            warnings.append(f"{qid}: unknown asset role {role!r}; treating as stem")
-            asset["role"] = "stem"
+            raise ValueError(f"{qid}: unsupported asset role {role!r}")
         if asset.get("role") == "choice":
             label = str(asset.get("choice_label") or "")
             if not label:
                 raise ValueError(f"{qid}: choice asset missing choice_label")
-            if choice_labels and label not in choice_labels:
+            if label not in choice_labels:
                 raise ValueError(f"{qid}: choice asset label {label!r} has no matching choice")
     return warnings
 
