@@ -402,9 +402,10 @@ def build_pdf(
         image_refs = resolve_images(question, bank_root, asset_index)
         image_cap = 150 * mm if len(image_refs) <= 1 else 88 * mm
         # Do not strand a question number/stem at the foot of one page while
-        # its circuit diagram begins on the next.
+        # its circuit diagram begins on the next. A full-height figure plus a
+        # short stem needs substantially more than the figure height alone.
         if index > 1:
-            story.append(CondPageBreak(125 * mm if image_refs else 55 * mm))
+            story.append(CondPageBreak(205 * mm if image_refs else 55 * mm))
         if show_source and source:
             source_doc = first_value(source, ["document", "file"], "")
             source_page = first_value(source, ["pdf_page", "source_page", "page"], "")

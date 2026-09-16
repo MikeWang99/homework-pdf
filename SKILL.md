@@ -12,6 +12,7 @@ Use this skill when the user has a reusable physics question bank and wants to c
 - Treat the question-bank JSON as the source of truth for question order, wording, points, answer data, and asset references.
 - Preserve the selected question's wording unless the user explicitly requests translation, adaptation, or numerical changes.
 - Resolve image paths relative to the question-bank JSON. Place each question's stem/choice image only with that question; never flatten a whole bank page into every question.
+- Keep a question stem and its required diagram on the same page; start the complete pair on the next page when the remaining space cannot hold both.
 - Use two independent typography roles: question stems and their export-order numbers use the exact Helvetica font used by the page header; multiple-choice options use the stable serif/math-like option font. Do not collapse both roles into one body style.
 - For a multiple-choice question with one or more images, use the fixed order `stem → centered image(s) → choices`; the image must sit directly below the stem and remain horizontally centered within the content column.
 - For a free-response question, reserve unruled blank space after its content, roughly proportional to the question's own footprint. Do not print `Response:` or draw writing lines. Multiple-choice questions receive no extra response space.
