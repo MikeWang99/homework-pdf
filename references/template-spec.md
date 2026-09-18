@@ -6,7 +6,7 @@ The deterministic builder uses these stable layout defaults. A user-supplied tem
 - Left/right content margin: `18 mm`.
 - Top content margin: `31 mm`; bottom content margin: `19 mm`.
 - Header title: centered Helvetica-like role, ~12 pt, with thin rule.
-- Page 1 score row: `Total Points`, `Score`, `Accuracy`.
+- Page 1 score row: `Total Points`, `Score`, `Accuracy`; unavailable values remain blank rather than using dash placeholders.
 - Question stem: ~11 pt sans-serif role; choices: ~11 pt serif/math role.
 - Required stem/shared diagrams stay with the stem through a `KeepTogether` compound block.
 - Choice images are rendered next to their matching choices, never collected above all options.

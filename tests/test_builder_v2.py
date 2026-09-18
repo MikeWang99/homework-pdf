@@ -65,7 +65,9 @@ class BuilderTests(unittest.TestCase):
             report.write_text(json.dumps({"output":str(out),"selected_ids":["q1"],**r}))
             result=V.validate(out,report)
             self.assertEqual(result["status"],"ok", result)
-            self.assertGreater(fitz.open(out).page_count,0)
+            rendered = fitz.open(out)
+            self.assertGreater(rendered.page_count,0)
+            self.assertNotIn("—", "\n".join(page.get_text() for page in rendered))
 
     def test_template_must_be_a4(self):
         with tempfile.TemporaryDirectory() as tmp:

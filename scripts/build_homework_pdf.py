@@ -37,6 +37,7 @@ TOP_MARGIN = 31 * mm
 BOTTOM_MARGIN = 19 * mm
 FOOTER_Y = 8.5 * mm
 DEFAULT_FOOTER = "Mike's Physics - Pocket Cosmos"
+MAX_IMAGE_WIDTH = 92 * mm
 SUPPORTED_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".bmp"}
 SUPPORTED_LATEX_COMMANDS = {
     "frac", "sqrt", "mathrm", "text", "textrm", "operatorname", "vec", "hat", "bar",
@@ -373,7 +374,12 @@ def register_local_font(path: str | None, name: str) -> str | None:
 
 def image_flowable(asset: dict, doc_width: float, max_height: float, caption_style: ParagraphStyle):
     image = RLImage(str(asset["path_resolved"]))
-    scale = min(doc_width * 0.96 / image.imageWidth, max_height / image.imageHeight, 1.0)
+    source_width = asset.get("source_width_pt")
+    source_height = asset.get("source_height_pt")
+    if source_width and source_height:
+        scale = min(float(source_width) / image.imageWidth, float(source_height) / image.imageHeight)
+    else:
+        scale = min(MAX_IMAGE_WIDTH / image.imageWidth, doc_width * 0.96 / image.imageWidth, max_height / image.imageHeight, 1.0)
     image.drawWidth *= scale; image.drawHeight *= scale
     table = Table([[image]], colWidths=[doc_width])
     table.setStyle(TableStyle([
@@ -395,7 +401,9 @@ def build_pdf(output: Path, data: dict, selected: list[dict], bank_root: Path, a
     assignment = data.get("assignment", {}) if isinstance(data.get("assignment"), dict) else {}
     total_raw = assignment.get("total_points")
     has_points = any(first_value(q, ["points", "official_marks", "marks"], None) is not None for q in selected)
-    total = format_number(sum(points_for(q) for q in selected)) if total_raw in (None, "") and has_points else ("—" if total_raw in (None, "") else str(total_raw))
+    # Leave the field blank when the selected bank records do not provide
+    # point values; do not render a dash as a student-facing placeholder.
+    total = format_number(sum(points_for(q) for q in selected)) if total_raw in (None, "") and has_points else ("" if total_raw in (None, "") else str(total_raw))
     score, accuracy = str(assignment.get("score", "")), str(assignment.get("accuracy", ""))
 
     doc = BaseDocTemplate(str(output), pagesize=A4, leftMargin=MARGIN_X, rightMargin=MARGIN_X, topMargin=TOP_MARGIN, bottomMargin=BOTTOM_MARGIN)
@@ -454,9 +462,10 @@ def build_pdf(output: Path, data: dict, selected: list[dict], bank_root: Path, a
         for choice in choices:
             if isinstance(choice, dict):
                 label = str(choice.get("label", "")); text = str(first_value(choice, ["text_markdown", "text", "content"], ""))
-                story.append(Paragraph(paragraph_markup(f"({label}) {text}"), option_style))
+                choice_bundle = [Paragraph(paragraph_markup(f"({label}) {text}"), option_style)]
                 for asset in choice_assets.get(label, []):
-                    flows, _ = image_flowable(asset, doc.width, 55*mm, caption_style); story.extend(flows)
+                    flows, _ = image_flowable(asset, doc.width, 55*mm, caption_style); choice_bundle.extend(flows)
+                story.append(KeepTogether(choice_bundle))
             else:
                 story.append(Paragraph(paragraph_markup(str(choice)), option_style))
 

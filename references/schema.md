@@ -20,12 +20,16 @@ Canonical v2 assets are top-level records referenced by `question.asset_ids`:
   "file": "assets/figures/q5-choice-a.png",
   "role": "choice",
   "choice_label": "A",
+  "source_width_pt": 217.5,
+  "source_height_pt": 125.25,
   "owners": ["q5"],
   "reviewed": true
 }
 ```
 
 Roles are `stem`, `shared`, and `choice`. `stem/shared` assets are rendered after the question context/stem and before choices. A `choice` asset is rendered directly with the matching choice and **must** have `choice_label`; mismatches are hard errors. Compact legacy `question.assets[]` and `question.asset` are still accepted.
+
+When an image was cropped from a source PDF, `source_width_pt` and `source_height_pt` should record the image's original displayed width and height in PDF points. When both are present, the renderer uses these physical dimensions instead of interpreting PNG/JPG pixels as PDF points. This preserves the source PDF's visual scale and is especially important for choice diagrams.
 
 ## Math
 
