@@ -69,6 +69,15 @@ class BuilderTests(unittest.TestCase):
             self.assertGreater(rendered.page_count,0)
             self.assertNotIn("—", "\n".join(page.get_text() for page in rendered))
 
+    def test_free_response_does_not_create_trailing_blank_page(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); manifest=root/"questions.json"; out=root/"homework.pdf"
+            manifest.write_text(json.dumps({"questions":[{"id":"q1","stem":"Solve for the acceleration."}]}))
+            data,qidx,aidx=B.load_bank(manifest)
+            B.build_pdf(out,data,[qidx["q1"]],root,aidx,"Physics","",False,False,None,None,"")
+            rendered=fitz.open(out)
+            self.assertEqual(rendered.page_count,1)
+
     def test_template_must_be_a4(self):
         with tempfile.TemporaryDirectory() as tmp:
             path=Path(tmp)/"bad.pdf"

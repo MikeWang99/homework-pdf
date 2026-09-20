@@ -474,7 +474,7 @@ def build_pdf(output: Path, data: dict, selected: list[dict], bank_root: Path, a
             if answer is None: answer = first_value(q, ["solution_markdown", "explanation"], "")
             if answer:
                 story.extend([Spacer(1, 3*mm), Paragraph("Answer / solution", small_style), Paragraph(paragraph_markup(answer_text(answer)), answer_style)])
-        elif not choices:
+        elif not choices and index < len(selected):
             blank_height = max(24*mm, min(80*mm, 18*mm + 0.35*total_stem_image_height))
             story.append(Spacer(1, blank_height))
         story.append(Spacer(1, 3*mm))
