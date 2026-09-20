@@ -1,9 +1,9 @@
 ---
 name: homework-pdf
-description: Generate deterministic, validated physics homework PDFs from question-bank v2 records, with correct stem/choice asset placement, explicit math compatibility checks, template validation, and post-build QA.
+description: Generate deterministic, validated physics homework PDFs from question-bank v2 records, with source-scaled figures, explicit narrative image placement, response-space rules, math compatibility checks, template validation, and post-build QA.
 ---
 
-# Homework PDF v2
+# Homework PDF v2.1
 
 Use this Skill to turn selected question-bank IDs into a printable student PDF. The bank is the source of truth; do not manually retype or rearrange question content when the builder can consume it directly.
 
@@ -15,14 +15,16 @@ Read `references/schema.md` and `references/template-spec.md` before execution.
 - Freeze selection order from explicit IDs; never silently export the entire bank.
 - Validate every selected record before rendering: non-empty text, resolvable assets, matching choice-image labels, and supported math commands.
 - `stem/shared` figures stay with the stem. `choice` figures render with their matching option via `choice_label`.
-- Free-response space is unruled blank space; no response label or writing lines.
+- `question.asset_ids` records ownership; when a figure must appear inside the narrative, ordered `layout_blocks` are authoritative for its placement. Do not infer semantic placement from source-page order.
+- Free-response space is unruled blank space; no response label or writing lines. By default, each structured FRQ subquestion receives one extra blank line after it. `layout_blocks` may declare additional local space with `spacer_lines`/`response_space`.
+- Multiple-choice questions use normal flow spacing. Keeping one complete question together is allowed when it fits, but do not add artificial gaps between MCQs.
 - Student numbering is export order (`1.`, `2.`, ...), never source-paper numbering.
 - Unknown/unsupported LaTeX is a hard error. Do not silently degrade mathematical notation.
 - A supplied template must be A4 portrait; the builder validates this rather than merely checking file existence.
 
 ## Standard workflow
 
-1. Inspect selected IDs and the bank's asset manifest.
+1. Inspect selected IDs, the bank's asset manifest, and any `layout_blocks` on the selected records. Confirm that the declared order matches the source question's narrative.
 2. Build with a machine-readable report:
 
    ```bash

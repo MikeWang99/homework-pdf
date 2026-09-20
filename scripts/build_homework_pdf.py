@@ -130,6 +130,30 @@ def question_sections(question: dict) -> tuple[str, list[dict[str, str]]]:
     return (stem.strip(), parts) if parts else split_inline_subquestions(stem)
 
 
+def layout_block_kind(block: dict) -> str:
+    """Normalize the compact and explicit layout-block spellings."""
+    if not isinstance(block, dict):
+        return ""
+    if block.get("type"):
+        return str(block["type"]).strip().lower()
+    if block.get("asset_id"):
+        return "figure"
+    if block.get("spacer_lines") is not None:
+        return "response_space"
+    if block.get("text") is not None:
+        return "text"
+    return ""
+
+
+def question_layout_blocks(question: dict) -> list[dict]:
+    raw = question.get("layout_blocks")
+    if raw in (None, ""):
+        return []
+    if not isinstance(raw, list) or not raw:
+        raise ValueError(f"{question.get('id', '<unknown>')}: layout_blocks must be a non-empty list")
+    return raw
+
+
 def points_for(question: dict) -> float:
     try:
         return float(first_value(question, ["points", "official_marks", "marks"], 0))
@@ -329,6 +353,52 @@ def validate_question(q: dict, bank_root: Path, asset_index: dict[str, dict]) ->
                 raise ValueError(f"{qid}: choice asset missing choice_label")
             if label not in choice_labels:
                 raise ValueError(f"{qid}: choice asset label {label!r} has no matching choice")
+    blocks = question_layout_blocks(q)
+    if blocks:
+        by_id = {str(asset.get("id")): asset for asset in assets if asset.get("id")}
+        placed_figures = []
+        has_text = False
+        for block in blocks:
+            kind = layout_block_kind(block)
+            if kind == "text":
+                if not str(block.get("text") or "").strip():
+                    raise ValueError(f"{qid}: layout text block is empty")
+                has_text = True
+            elif kind == "figure":
+                asset_id = str(block.get("asset_id") or "")
+                if not asset_id or asset_id not in by_id:
+                    raise ValueError(f"{qid}: layout figure references unknown asset {asset_id!r}")
+                asset = by_id[asset_id]
+                if asset.get("role") not in {"stem", "shared"}:
+                    raise ValueError(f"{qid}: layout figure {asset_id!r} must have role stem/shared")
+                placed_figures.append(asset_id)
+                max_height = block.get("max_height_mm", asset.get("max_height_mm"))
+                if max_height is not None:
+                    try:
+                        if float(max_height) <= 0:
+                            raise ValueError
+                    except (TypeError, ValueError):
+                        raise ValueError(f"{qid}: layout figure {asset_id!r} has invalid max_height_mm")
+            elif kind == "response_space":
+                try:
+                    if float(block.get("lines", block.get("spacer_lines", 1))) < 0:
+                        raise ValueError
+                except (TypeError, ValueError):
+                    raise ValueError(f"{qid}: response_space lines must be a non-negative number")
+            else:
+                raise ValueError(f"{qid}: unsupported layout block type {kind!r}")
+        if not has_text:
+            raise ValueError(f"{qid}: layout_blocks must contain a text block")
+        if len(placed_figures) != len(set(placed_figures)):
+            raise ValueError(f"{qid}: layout figure assets may only be placed once")
+        expected_figures = {str(asset.get("id")) for asset in assets if asset.get("role") in {"stem", "shared"}}
+        if set(placed_figures) != expected_figures:
+            missing = sorted(expected_figures - set(placed_figures))
+            extra = sorted(set(placed_figures) - expected_figures)
+            detail = []
+            if missing: detail.append(f"missing {', '.join(missing)}")
+            if extra: detail.append(f"unexpected {', '.join(extra)}")
+            raise ValueError(f"{qid}: layout figure coverage mismatch ({'; '.join(detail)})")
     return warnings
 
 
@@ -436,6 +506,39 @@ def build_pdf(output: Path, data: dict, selected: list[dict], bank_root: Path, a
         source = q.get("source", {}) if isinstance(q.get("source"), dict) else {}
         context = str(q.get("context") or "").strip()
         stem, subquestions = question_sections(q)
+        choices = q.get("choices") or []
+        layout_blocks = question_layout_blocks(q)
+
+        if layout_blocks:
+            assets_by_id = {str(asset.get("id")): asset for asset in assets if asset.get("id")}
+            first_text = True
+            total_layout_image_height = 0.0
+            for block in layout_blocks:
+                kind = layout_block_kind(block)
+                if kind == "text":
+                    prefix = f"{index}. " if first_text else ""
+                    story.extend(markdown_flowables(prefix + str(block["text"]), qstyle, display_style))
+                    first_text = False
+                elif kind == "figure":
+                    asset = assets_by_id[str(block["asset_id"])]
+                    max_height_mm = block.get("max_height_mm", asset.get("max_height_mm", 135))
+                    flows, height = image_flowable(asset, doc.width, float(max_height_mm) * mm, caption_style)
+                    story.extend(flows)
+                    total_layout_image_height += height
+                elif kind == "response_space":
+                    lines = float(block.get("lines", block.get("spacer_lines", 1)))
+                    story.append(Spacer(1, lines * qstyle.leading))
+            if show_answers:
+                answer = q.get("answer")
+                if answer is None: answer = first_value(q, ["solution_markdown", "explanation"], "")
+                if answer:
+                    story.extend([Spacer(1, 3*mm), Paragraph("Answer / solution", small_style), Paragraph(paragraph_markup(answer_text(answer)), answer_style)])
+            elif not choices and index < len(selected):
+                # Layout blocks normally contain per-subquestion response space;
+                # reserve a compact final buffer before the next question.
+                story.append(Spacer(1, 24*mm))
+            story.append(Spacer(1, 3*mm))
+            continue
 
         bundle = []
         if show_source and source:
@@ -451,23 +554,25 @@ def build_pdf(output: Path, data: dict, selected: list[dict], bank_root: Path, a
         else:
             bundle.append(Paragraph(f"{index}.", qstyle))
         for part in subquestions:
-            bundle.append(Paragraph(paragraph_markup(f"**{part['label']}** {part['text']}"), part_style))
+            bundle.extend(markdown_flowables(f"**{part['label']}** {part['text']}", part_style, display_style))
+            if not choices:
+                # One additional unruled line after every FRQ subquestion.
+                bundle.append(Spacer(1, qstyle.leading))
         total_stem_image_height = 0.0
         per_image_cap = min(135*mm, (145*mm / max(1, len(stem_assets))))
         for asset in stem_assets:
             flows, h = image_flowable(asset, doc.width, per_image_cap, caption_style); bundle.extend(flows); total_stem_image_height += h
-        story.append(KeepTogether(bundle))
-
-        choices = q.get("choices") or []
+        question_flowables = list(bundle)
         for choice in choices:
             if isinstance(choice, dict):
                 label = str(choice.get("label", "")); text = str(first_value(choice, ["text_markdown", "text", "content"], ""))
                 choice_bundle = [Paragraph(paragraph_markup(f"({label}) {text}"), option_style)]
                 for asset in choice_assets.get(label, []):
                     flows, _ = image_flowable(asset, doc.width, 55*mm, caption_style); choice_bundle.extend(flows)
-                story.append(KeepTogether(choice_bundle))
+                question_flowables.extend(choice_bundle)
             else:
-                story.append(Paragraph(paragraph_markup(str(choice)), option_style))
+                question_flowables.append(Paragraph(paragraph_markup(str(choice)), option_style))
+        story.append(KeepTogether(question_flowables))
 
         if show_answers:
             answer = q.get("answer")

@@ -78,6 +78,42 @@ class BuilderTests(unittest.TestCase):
             rendered=fitz.open(out)
             self.assertEqual(rendered.page_count,1)
 
+    def test_free_response_subquestions_receive_one_extra_line(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); out=root/"homework.pdf"
+            manifest=root/"questions.json"
+            manifest.write_text(json.dumps({"questions":[{"id":"q1","stem":"(a) First part.\n(b) Second part."}]}))
+            data,qidx,aidx=B.load_bank(manifest)
+            B.build_pdf(out,data,[qidx["q1"]],root,aidx,"Physics","",False,False,None,None,"")
+            page=fitz.open(out)[0]
+            blocks=[b for b in page.get_text("blocks") if "First part" in b[4] or "Second part" in b[4]]
+            self.assertEqual(len(blocks),2)
+            self.assertGreater(blocks[1][1] - blocks[0][3], 20)
+
+    def test_layout_blocks_place_figures_in_declared_order(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); img=root/"figure.png"; img.write_bytes(PNG); out=root/"homework.pdf"
+            manifest=root/"questions.json"
+            manifest.write_text(json.dumps({
+                "questions":[{"id":"q1","stem":"Source-faithful text.","asset_ids":["fig"],"layout_blocks":[
+                    {"text":"Introductory text."}, {"asset_id":"fig"}, {"text":"Text after the figure."}
+                ]}],
+                "assets":[{"id":"fig","file":"figure.png","role":"stem"}]
+            }))
+            data,qidx,aidx=B.load_bank(manifest)
+            B.build_pdf(out,data,[qidx["q1"]],root,aidx,"Physics","",False,False,None,None,"")
+            page=fitz.open(out)[0]
+            rect=page.get_image_rects(page.get_images(full=True)[0][0])[0]
+            after=[b for b in page.get_text("blocks") if "Text after the figure." in b[4]][0]
+            self.assertLess(rect.y1, after[1])
+
+    def test_layout_blocks_require_all_stem_figures(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); (root/"a.png").write_bytes(PNG); (root/"b.png").write_bytes(PNG)
+            q={"id":"q1","stem":"x","asset_ids":["a","b"],"layout_blocks":[{"text":"x"},{"asset_id":"a"}]}
+            assets={"a":{"id":"a","file":"a.png","role":"stem"},"b":{"id":"b","file":"b.png","role":"stem"}}
+            with self.assertRaises(ValueError): B.validate_question(q,root,assets)
+
     def test_template_must_be_a4(self):
         with tempfile.TemporaryDirectory() as tmp:
             path=Path(tmp)/"bad.pdf"

@@ -31,13 +31,34 @@ Roles are `stem`, `shared`, and `choice`. `stem/shared` assets are rendered afte
 
 When an image was cropped from a source PDF, `source_width_pt` and `source_height_pt` should record the image's original displayed width and height in PDF points. When both are present, the renderer uses these physical dimensions instead of interpreting PNG/JPG pixels as PDF points. This preserves the source PDF's visual scale and is especially important for choice diagrams.
 
+## Ordered figure/text layout
+
+`question.asset_ids` identifies which assets belong to the question; it does not encode where an asset belongs in the question narrative. For FRQs with figures interleaved with prose, use the optional ordered `layout_blocks` field:
+
+```json
+[
+  {"text": "A sample of gas is shown below."},
+  {"asset_id": "q46-pv-initial", "max_height_mm": 70},
+  {"text": "A student draws a correct bar chart."},
+  {"spacer_lines": 1}
+]
+```
+
+The builder accepts the explicit equivalent spellings `{"type":"text", ...}`, `{"type":"figure", ...}`, and `{"type":"response_space", "lines": 1}`. The compact forms above are preferred for hand-authored derived manifests.
+
+- Text blocks render in declared order; export numbering is prefixed only to the first text block.
+- Figure blocks reference `stem`/`shared` assets exactly once. Every `stem`/`shared` asset listed in `asset_ids` must be placed in the layout blocks.
+- `max_height_mm` is a local display cap. When source dimensions are present, `source_width_pt`/`source_height_pt` still control the figure's physical source scale within that cap.
+- `spacer_lines`/`response_space` creates unruled answer space; it does not draw writing lines.
+- If `layout_blocks` is absent, `stem`/`shared` assets retain the legacy placement after the stem.
+
 ## Math
 
 The canonical bank remains `markdown+latex`. Homework PDF v2 supports inline `$...$` and display `$$...$$` plus the documented common physics command subset implemented in the builder. Unknown LaTeX commands are a hard build error instead of being silently dropped or printed incorrectly.
 
 ## Response area
 
-Free-response questions receive **unruled blank space** only. No `Response:` label and no writing lines. Multi-part labels remain part of the question text; the blank area follows the complete question.
+Free-response questions receive **unruled blank space** only. No `Response:` label and no writing lines. Multi-part labels remain part of the question text. The default builder inserts one extra blank line after each structured FRQ subquestion; use ordered `layout_blocks` with `spacer_lines`/`response_space` when the response space must be placed between prose and figures.
 
 ## Selection
 
