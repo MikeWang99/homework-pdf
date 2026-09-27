@@ -397,7 +397,8 @@ def validate_question(q: dict, bank_root: Path, asset_index: dict[str, dict]) ->
         raise ValueError(f"{qid}: empty question text")
     unsupported = find_unsupported_latex("\n".join([context, stem] + [str(c.get("text", "")) for c in q.get("choices") or [] if isinstance(c, dict)]))
     if unsupported:
-        raise ValueError(f"{qid}: unsupported LaTeX commands: {', '.join('\\'+c for c in unsupported)}")
+        unsupported_text = ", ".join("\\" + command for command in unsupported)
+        raise ValueError(f"{qid}: unsupported LaTeX commands: {unsupported_text}")
     bare_math = []
     for field, text in question_math_fragments(q):
         for token in find_bare_math_markup(text):
