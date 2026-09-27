@@ -3,7 +3,7 @@ name: homework-pdf
 description: Generate deterministic, validated physics homework PDFs from question-bank v2 records, with source-scaled figures, explicit narrative image placement, response-space rules, math compatibility checks, template validation, and post-build QA.
 ---
 
-# Homework PDF v2.1
+# Homework PDF v2.2
 
 Use this Skill to turn selected question-bank IDs into a printable student PDF. The bank is the source of truth; do not manually retype or rearrange question content when the builder can consume it directly.
 
@@ -13,13 +13,118 @@ Read `references/schema.md` and `references/template-spec.md` before execution.
 
 - Preserve selected wording unless the user explicitly requests adaptation.
 - Freeze selection order from explicit IDs; never silently export the entire bank.
-- Validate every selected record before rendering: non-empty text, resolvable assets, matching choice-image labels, and supported math commands.
+- Validate every selected record before rendering: non-empty text, resolvable assets, matching choice-image labels, supported math commands, and canonical math delimiters.
 - `stem/shared` figures stay with the stem. `choice` figures render with their matching option via `choice_label`.
 - `question.asset_ids` records ownership; when a figure must appear inside the narrative, ordered `layout_blocks` are authoritative for its placement. Do not infer semantic placement from source-page order.
 - Free-response space is unruled blank space; no response label or writing lines. By default, each structured FRQ subquestion receives one extra blank line after it. `layout_blocks` may declare additional local space with `spacer_lines`/`response_space`.
 - Multiple-choice questions use normal flow spacing. Keeping one complete question together is allowed when it fits, but do not add artificial gaps between MCQs.
 - Student numbering is export order (`1.`, `2.`, ...), never source-paper numbering.
-- Unknown/unsupported LaTeX is a hard error. Do not silently degrade mathematical notation.
+- Unknown/unsupported LaTeX is a hard error. Bare math syntax outside `$...---
+name: homework-pdf
+description: Generate deterministic, validated physics homework PDFs from question-bank v2 records, with source-scaled figures, explicit narrative image placement, response-space rules, math compatibility checks, template validation, and post-build QA.
+---
+
+# Homework PDF v2.2
+
+Use this Skill to turn selected question-bank IDs into a printable student PDF. The bank is the source of truth; do not manually retype or rearrange question content when the builder can consume it directly.
+
+Read `references/schema.md` and `references/template-spec.md` before execution.
+
+## Hard requirements
+
+- Preserve selected wording unless the user explicitly requests adaptation.
+- Freeze selection order from explicit IDs; never silently export the entire bank.
+- Validate every selected record before rendering: non-empty text, resolvable assets, matching choice-image labels, supported math commands, and canonical math delimiters.
+- `stem/shared` figures stay with the stem. `choice` figures render with their matching option via `choice_label`.
+- `question.asset_ids` records ownership; when a figure must appear inside the narrative, ordered `layout_blocks` are authoritative for its placement. Do not infer semantic placement from source-page order.
+- Free-response space is unruled blank space; no response label or writing lines. By default, each structured FRQ subquestion receives one extra blank line after it. `layout_blocks` may declare additional local space with `spacer_lines`/`response_space`.
+- Multiple-choice questions use normal flow spacing. Keeping one complete question together is allowed when it fits, but do not add artificial gaps between MCQs.
+- Student numbering is export order (`1.`, `2.`, ...), never source-paper numbering.
+ / `$...$` is also a hard error. For example, `U_K`, `v_0`, `x^2`, or `\mu_s` must be fixed in the canonical bank as `$U_K---
+name: homework-pdf
+description: Generate deterministic, validated physics homework PDFs from question-bank v2 records, with source-scaled figures, explicit narrative image placement, response-space rules, math compatibility checks, template validation, and post-build QA.
+---
+
+# Homework PDF v2.2
+
+Use this Skill to turn selected question-bank IDs into a printable student PDF. The bank is the source of truth; do not manually retype or rearrange question content when the builder can consume it directly.
+
+Read `references/schema.md` and `references/template-spec.md` before execution.
+
+## Hard requirements
+
+- Preserve selected wording unless the user explicitly requests adaptation.
+- Freeze selection order from explicit IDs; never silently export the entire bank.
+- Validate every selected record before rendering: non-empty text, resolvable assets, matching choice-image labels, supported math commands, and canonical math delimiters.
+- `stem/shared` figures stay with the stem. `choice` figures render with their matching option via `choice_label`.
+- `question.asset_ids` records ownership; when a figure must appear inside the narrative, ordered `layout_blocks` are authoritative for its placement. Do not infer semantic placement from source-page order.
+- Free-response space is unruled blank space; no response label or writing lines. By default, each structured FRQ subquestion receives one extra blank line after it. `layout_blocks` may declare additional local space with `spacer_lines`/`response_space`.
+- Multiple-choice questions use normal flow spacing. Keeping one complete question together is allowed when it fits, but do not add artificial gaps between MCQs.
+- Student numbering is export order (`1.`, `2.`, ...), never source-paper numbering.
+, `$v_0---
+name: homework-pdf
+description: Generate deterministic, validated physics homework PDFs from question-bank v2 records, with source-scaled figures, explicit narrative image placement, response-space rules, math compatibility checks, template validation, and post-build QA.
+---
+
+# Homework PDF v2.2
+
+Use this Skill to turn selected question-bank IDs into a printable student PDF. The bank is the source of truth; do not manually retype or rearrange question content when the builder can consume it directly.
+
+Read `references/schema.md` and `references/template-spec.md` before execution.
+
+## Hard requirements
+
+- Preserve selected wording unless the user explicitly requests adaptation.
+- Freeze selection order from explicit IDs; never silently export the entire bank.
+- Validate every selected record before rendering: non-empty text, resolvable assets, matching choice-image labels, supported math commands, and canonical math delimiters.
+- `stem/shared` figures stay with the stem. `choice` figures render with their matching option via `choice_label`.
+- `question.asset_ids` records ownership; when a figure must appear inside the narrative, ordered `layout_blocks` are authoritative for its placement. Do not infer semantic placement from source-page order.
+- Free-response space is unruled blank space; no response label or writing lines. By default, each structured FRQ subquestion receives one extra blank line after it. `layout_blocks` may declare additional local space with `spacer_lines`/`response_space`.
+- Multiple-choice questions use normal flow spacing. Keeping one complete question together is allowed when it fits, but do not add artificial gaps between MCQs.
+- Student numbering is export order (`1.`, `2.`, ...), never source-paper numbering.
+, `$x^2---
+name: homework-pdf
+description: Generate deterministic, validated physics homework PDFs from question-bank v2 records, with source-scaled figures, explicit narrative image placement, response-space rules, math compatibility checks, template validation, and post-build QA.
+---
+
+# Homework PDF v2.2
+
+Use this Skill to turn selected question-bank IDs into a printable student PDF. The bank is the source of truth; do not manually retype or rearrange question content when the builder can consume it directly.
+
+Read `references/schema.md` and `references/template-spec.md` before execution.
+
+## Hard requirements
+
+- Preserve selected wording unless the user explicitly requests adaptation.
+- Freeze selection order from explicit IDs; never silently export the entire bank.
+- Validate every selected record before rendering: non-empty text, resolvable assets, matching choice-image labels, supported math commands, and canonical math delimiters.
+- `stem/shared` figures stay with the stem. `choice` figures render with their matching option via `choice_label`.
+- `question.asset_ids` records ownership; when a figure must appear inside the narrative, ordered `layout_blocks` are authoritative for its placement. Do not infer semantic placement from source-page order.
+- Free-response space is unruled blank space; no response label or writing lines. By default, each structured FRQ subquestion receives one extra blank line after it. `layout_blocks` may declare additional local space with `spacer_lines`/`response_space`.
+- Multiple-choice questions use normal flow spacing. Keeping one complete question together is allowed when it fits, but do not add artificial gaps between MCQs.
+- Student numbering is export order (`1.`, `2.`, ...), never source-paper numbering.
+, or `$\mu_s---
+name: homework-pdf
+description: Generate deterministic, validated physics homework PDFs from question-bank v2 records, with source-scaled figures, explicit narrative image placement, response-space rules, math compatibility checks, template validation, and post-build QA.
+---
+
+# Homework PDF v2.2
+
+Use this Skill to turn selected question-bank IDs into a printable student PDF. The bank is the source of truth; do not manually retype or rearrange question content when the builder can consume it directly.
+
+Read `references/schema.md` and `references/template-spec.md` before execution.
+
+## Hard requirements
+
+- Preserve selected wording unless the user explicitly requests adaptation.
+- Freeze selection order from explicit IDs; never silently export the entire bank.
+- Validate every selected record before rendering: non-empty text, resolvable assets, matching choice-image labels, supported math commands, and canonical math delimiters.
+- `stem/shared` figures stay with the stem. `choice` figures render with their matching option via `choice_label`.
+- `question.asset_ids` records ownership; when a figure must appear inside the narrative, ordered `layout_blocks` are authoritative for its placement. Do not infer semantic placement from source-page order.
+- Free-response space is unruled blank space; no response label or writing lines. By default, each structured FRQ subquestion receives one extra blank line after it. `layout_blocks` may declare additional local space with `spacer_lines`/`response_space`.
+- Multiple-choice questions use normal flow spacing. Keeping one complete question together is allowed when it fits, but do not add artificial gaps between MCQs.
+- Student numbering is export order (`1.`, `2.`, ...), never source-paper numbering.
+. Do not guess or auto-rewrite underscores in the PDF renderer.
 - A supplied template must be A4 portrait; the builder validates this rather than merely checking file existence.
 
 ## Standard workflow
@@ -44,7 +149,7 @@ Read `references/schema.md` and `references/template-spec.md` before execution.
      --report "$TMPDIR/homework-validation.json"
    ```
 
-4. Render final PDF pages to images and visually inspect every page, especially large diagrams, circuits/graphs, multi-part questions, choice-image questions, and page breaks. Rebuild after clipping, overlap, wrong option-image association, bad math, missing footer, or missing page number.
+4. Render final PDF pages to images and visually inspect every page, especially large diagrams, circuits/graphs, multi-part questions, choice-image questions, math subscripts/superscripts, and page breaks. Rebuild after clipping, overlap, wrong option-image association, bad math, missing footer, or missing page number.
 5. Deliver only validated final PDF(s).
 
 ## Useful options
