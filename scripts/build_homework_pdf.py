@@ -170,6 +170,63 @@ def find_unsupported_latex(text: str) -> list[str]:
     return sorted(commands - SUPPORTED_LATEX_COMMANDS)
 
 
+def _mask_valid_math_code_urls(text: str) -> str:
+    value = str(text or "")
+    def blank(match: re.Match) -> str:
+        return " " * len(match.group(0))
+    value = re.sub(r"`[^`\n]*`", blank, value)
+    value = re.sub(r"https?://\S+", blank, value)
+    value = re.sub(r"\$\$.*?\$\$", blank, value, flags=re.S)
+    value = re.sub(r"\$[^$\n]+\$", blank, value)
+    return value
+
+
+_BARE_MATH_PATTERNS = [
+    re.compile(r"\\[A-Za-z]+_(?:\{[^{}\n]+\}|[A-Za-z0-9+\-]+)"),
+    re.compile(r"\\[A-Za-z]+\^(?:\{[^{}\n]+\}|[A-Za-z0-9+\-]+)"),
+    re.compile(r"\\[A-Za-z]+"),
+    re.compile(r"(?<![A-Za-z0-9])(?:[A-Za-zΑ-Ωα-ωµμ][A-Za-z0-9]*|[0-9]+)_(?:\{[^{}\n]+\}|[A-Za-z0-9+\-]+)"),
+    re.compile(r"(?<![A-Za-z0-9])(?:[A-Za-zΑ-Ωα-ωµμ][A-Za-z0-9]*|[0-9]+)\^(?:\{[^{}\n]+\}|[A-Za-z0-9+\-]+)"),
+]
+
+
+def find_bare_math_markup(text: str) -> list[str]:
+    """Find explicit math syntax that escaped $...$/$...$ delimiters."""
+    masked = _mask_valid_math_code_urls(text)
+    found = []
+    for pattern in _BARE_MATH_PATTERNS:
+        for match in pattern.finditer(masked):
+            token = match.group(0)
+            if token not in found:
+                found.append(token)
+    if "$" in masked:
+        found.append("<unmatched-$>")
+    return found
+
+
+def question_math_fragments(q: dict) -> list[tuple[str, str]]:
+    out = []
+    context = str(q.get("context") or "")
+    stem = question_text(q).strip()
+    if context:
+        out.append(("context", context))
+    if stem:
+        out.append(("stem", stem))
+    for index, choice in enumerate(q.get("choices") or [], start=1):
+        if isinstance(choice, dict):
+            text = str(first_value(choice, ["text_markdown", "text", "content"], "") or "")
+            if text:
+                out.append((f"choice[{choice.get('label', index)}]", text))
+        elif choice:
+            out.append((f"choice[{index}]", str(choice)))
+    for index, block in enumerate(question_layout_blocks(q), start=1):
+        if layout_block_kind(block) == "text":
+            text = str(block.get("text") or "")
+            if text:
+                out.append((f"layout_blocks[{index}]", text))
+    return out
+
+
 def _simple_fraction(text: str) -> str:
     pattern = re.compile(r"\\frac\{([^{}]+)\}\{([^{}]+)\}")
     old = None
@@ -340,7 +397,20 @@ def validate_question(q: dict, bank_root: Path, asset_index: dict[str, dict]) ->
         raise ValueError(f"{qid}: empty question text")
     unsupported = find_unsupported_latex("\n".join([context, stem] + [str(c.get("text", "")) for c in q.get("choices") or [] if isinstance(c, dict)]))
     if unsupported:
-        raise ValueError(f"{qid}: unsupported LaTeX commands: {', '.join('\\'+c for c in unsupported)}")
+        unsupported_text = ", ".join("\\" + command for command in unsupported)
+        raise ValueError(f"{qid}: unsupported LaTeX commands: {unsupported_text}")
+    bare_math = []
+    for field, text in question_math_fragments(q):
+        for token in find_bare_math_markup(text):
+            pair = (field, token)
+            if pair not in bare_math:
+                bare_math.append(pair)
+    if bare_math:
+        detail = "; ".join(f"{field}: {token!r}" for field, token in bare_math[:12])
+        raise ValueError(
+            f"{qid}: bare/unbalanced math markup outside $...$: {detail}. "
+            "Fix the canonical physics-bank text (for example U_K → $U_K$) instead of relying on PDF font/rendering."
+        )
     assets = resolve_assets(q, bank_root, asset_index)
     choice_labels = {str(c.get("label")) for c in q.get("choices") or [] if isinstance(c, dict) and c.get("label") is not None}
     for asset in assets:

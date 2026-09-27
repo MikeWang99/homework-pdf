@@ -55,6 +55,34 @@ class BuilderTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaises(ValueError): B.validate_question(q, Path(tmp), {})
 
+    def test_bare_subscript_math_fails_before_render(self):
+        q={"id":"q1","stem":"The kinetic energy is U_K.","asset_ids":[]}
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaisesRegex(ValueError, "bare/unbalanced math markup"):
+                B.validate_question(q, Path(tmp), {})
+
+    def test_wrapped_subscript_math_passes(self):
+        q={"id":"q1","stem":"The kinetic energy is $U_K$.","asset_ids":[]}
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertEqual(B.validate_question(q, Path(tmp), {}), [])
+
+    def test_bare_math_inside_layout_block_fails(self):
+        q={"id":"q1","stem":"Canonical text.","layout_blocks":[{"text":"Use v_0 to continue."}],"asset_ids":[]}
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaisesRegex(ValueError, "layout_blocks"):
+                B.validate_question(q, Path(tmp), {})
+
+    def test_valid_subscript_renders_without_literal_underscore(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); manifest=root/"questions.json"; out=root/"homework.pdf"
+            manifest.write_text(json.dumps({"questions":[{"id":"q1","stem":"The kinetic energy is $U_K$."}]}))
+            data,qidx,aidx=B.load_bank(manifest)
+            B.build_pdf(out,data,[qidx["q1"]],root,aidx,"Physics","",False,False,None,None,"")
+            text="\n".join(page.get_text() for page in fitz.open(out))
+            self.assertNotIn("U_K", text)
+            self.assertIn("U", text)
+            self.assertIn("K", text)
+
     def test_build_and_post_validate(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp); (root/"a.png").write_bytes(PNG)

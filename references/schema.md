@@ -54,7 +54,23 @@ The builder accepts the explicit equivalent spellings `{"type":"text", ...}`, `{
 
 ## Math
 
-The canonical bank remains `markdown+latex`. Homework PDF v2 supports inline `$...$` and display `$$...$$` plus the documented common physics command subset implemented in the builder. Unknown LaTeX commands are a hard build error instead of being silently dropped or printed incorrectly.
+The canonical bank remains `markdown+latex`. Homework PDF v2.2 supports inline `$...$` and display `$$...$$` plus the documented common physics command subset implemented in the builder.
+
+Math semantics must come from the bank, not from font heuristics or global underscore rewriting.
+
+Valid:
+
+```text
+The kinetic energy is $U_K$ and the initial speed is $v_0$.
+```
+
+Invalid:
+
+```text
+The kinetic energy is U_K and the initial speed is v_0.
+```
+
+The builder rejects bare underscore subscripts, caret superscripts, LaTeX commands, and unmatched dollar delimiters before rendering. Unknown LaTeX commands are also a hard build error. Fix the canonical physics-bank record rather than teaching the PDF renderer to guess which underscores are mathematical.
 
 ## Response area
 
