@@ -1,4 +1,4 @@
 interface:
   display_name: "作业 PDF"
   short_description: "从题库稳定生成并校验作业 PDF"
-  default_prompt: "Use $homework-pdf v2 end-to-end: validate selected bank records, preserve choice-image ownership, build with a report, run post-build validation, visually inspect the final pages, and only then deliver the PDF."
+  default_prompt: "Use $homework-pdf v2.2 end-to-end. Treat the bank as the source of truth. Before rendering, reject bare math syntax such as U_K, v_0, x^2 or \\mu_s outside $...$/$$...$$ instead of guessing from underscores or fonts. Then preserve choice-image ownership/layout, build with a report, run post-build validation, visually inspect final pages, and only then deliver the PDF."
